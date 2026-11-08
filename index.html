@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>Price History</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#fff; --ink:#2c3e50; --muted:#7f8c8d; --line:#e3e8ee;
+    --blue:#2563eb; --blue-d:#1d4ed8; --head:#34495e;
+    --green:#15803d; --green-bg:#e8f7ee; --red:#c0392b; --red-bg:#fdecea;
+    --amber:#b45309; --amber-bg:#fff4e0; --gray:#8a96a3; --gray-bg:#eef1f4;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:13px;color:#333;background:var(--bg);padding:12px}
+  .wrap{background:var(--card);border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.06);padding:14px}
+  .top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;border-bottom:3px solid var(--blue);padding-bottom:8px;margin-bottom:10px}
+  .title{font-size:17px;font-weight:700;color:var(--ink)}
+  .title small{font-weight:500;color:var(--muted);font-size:11px;margin-left:6px}
+  .pills{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .pill{padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--gray-bg);color:var(--muted)}
+  .pill.ok{background:var(--green-bg);color:var(--green)}
+  .pill.err{background:var(--red-bg);color:var(--red)}
+  .pill.busy{background:var(--amber-bg);color:var(--amber)}
+  button{font:inherit;cursor:pointer}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:5px;padding:5px 10px;font-weight:600;color:var(--ink)}
+  .btn:hover{background:#f6f8fb}
+  .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;background:#ecf0f1;padding:10px;border-radius:6px}
+  .seg{display:inline-flex;border:1px solid #bdc3c7;border-radius:5px;overflow:hidden}
+  .seg button{border:0;background:#fff;padding:7px 12px;font-weight:600;color:var(--muted)}
+  .seg button.on{background:var(--blue);color:#fff}
+  .f{display:flex;flex-direction:column;gap:3px;min-width:170px}
+  .f.grow{flex:1}
+  .f label{font-size:11px;font-weight:700;color:var(--muted)}
+  .f input{padding:7px 9px;border:1px solid #bdc3c7;border-radius:4px;font:inherit;background:#fff}
+  .f input:focus{outline:2px solid #bcd0fb;border-color:var(--blue)}
+  .chk{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink);padding-bottom:7px}
+  .chk[hidden]{display:none}
+  .ctx{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;font-size:12px;color:var(--ink)}
+  .tag{background:#eef3ff;color:#1e40af;border-radius:4px;padding:2px 8px;font-weight:600}
+  .tag.warn{background:var(--amber-bg);color:var(--amber)}
+  .msg{padding:22px;text-align:center;color:var(--muted)}
+  .msg.err{color:var(--red)}
+  .tw{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:6px;margin-top:8px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{position:sticky;top:0;background:var(--head);color:#fff;font-weight:600;font-size:12px;z-index:1}
+  td.n,th.n{text-align:right}
+  tr.row{cursor:pointer}
+  tr.row:hover{background:#f6f8fb}
+  tr.cur td:first-child{box-shadow:inset 3px 0 0 var(--blue)}
+  .badge{display:inline-block;background:var(--blue);color:#fff;border-radius:999px;font-size:10px;padding:1px 7px;margin-left:6px;vertical-align:middle}
+  .price{font-weight:700;font-size:14px}
+  .up{color:var(--green);font-weight:700} .down{color:var(--red);font-weight:700} .flat{color:var(--gray)}
+  .bad.up{color:var(--red)} .bad.down{color:var(--green)}
+  .fx{font-size:10px;color:var(--amber);background:var(--amber-bg);border-radius:3px;padding:0 4px;margin-left:4px}
+  .copy{border:1px solid var(--line);background:#fff;border-radius:4px;padding:2px 7px;font-size:11px}
+  .copy:hover{background:var(--blue);color:#fff}
+  tr.detail td{background:#f8fafc;padding:8px 14px 12px}
+  tr.detail table{width:auto;min-width:420px}
+  tr.detail th{position:static;background:#64748b;font-size:11px}
+  .hide-others .oth{display:none}
+  .note{font-size:11px;color:var(--muted);line-height:1.6;margin-top:10px}
+  details{margin-top:12px;font-size:12px}
+  summary{cursor:pointer;color:var(--muted);font-weight:600}
+  pre{background:#f4f6f9;padding:8px;border-radius:4px;max-height:220px;overflow:auto;font-size:11px;white-space:pre-wrap;word-break:break-all}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div class="title">💲 Price History <small>for Manager.io · v1.0 · GET · Read-Only 🔒</small></div>
+    <div class="pills">
+      <span id="connPill" class="pill busy">Connecting…</span>
+      <span id="originPill" class="pill hidden"></span>
+      <button id="reloadBtn" class="btn">↻ Reload data</button>
+    </div>
+  </div>
+
+  <div class="bar">
+    <div class="seg" id="modeSeg">
+      <button data-m="sales" class="on">Customer (sales)</button>
+      <button data-m="purchase">Supplier (purchases)</button>
+    </div>
+    <div class="f grow">
+      <label for="partyIn" id="partyLbl">Customer</label>
+      <input id="partyIn" list="partyList" placeholder="Type to search…" autocomplete="off">
+      <datalist id="partyList"></datalist>
+    </div>
+    <div class="f grow">
+      <label for="q">Filter products</label>
+      <input id="q" type="text" placeholder="Product name…" autocomplete="off">
+    </div>
+    <label class="chk" id="curWrap" hidden><input type="checkbox" id="onlyCur"> Only items on this invoice</label>
+    <label class="chk"><input type="checkbox" id="showOthers"> Compare with other <span id="othersLbl">customers</span></label>
+  </div>
+
+  <div class="ctx" id="ctxLine"></div>
+  <div class="msg" id="msg">Loading…</div>
+
+  <div class="tw hidden" id="tw">
+    <table id="tbl" class="hide-others">
+      <thead><tr>
+        <th>Product</th>
+        <th class="n">Last price</th>
+        <th>Date</th>
+        <th class="n">Change</th>
+        <th class="n">Qty</th>
+        <th class="n">Min</th>
+        <th class="n">Avg</th>
+        <th class="n">Max</th>
+        <th class="n">Times</th>
+        <th>Trend</th>
+        <th class="n oth">Others: last</th>
+        <th class="n oth">Others: avg</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="note" id="foot"></div>
+
+  <details id="diag">
+    <summary>Diagnostics (for troubleshooting)</summary>
+    <div class="note" id="diagInfo"></div>
+    <div class="note"><b>Last page context from Manager:</b></div>
+    <pre id="ctxRaw">(none yet)</pre>
+    <div class="note"><b>Sample invoice line:</b></div>
+    <pre id="lineRaw">(none yet)</pre>
+  </details>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Config ---------- */
+  const PATHS = {
+    sales: '/api4/sales-invoice-batch',
+    purchase: '/api4/purchase-invoice-batch',
+    customers: '/api4/customer-batch',
+    suppliers: '/api4/supplier-batch',
+    inv: '/api4/inventory-item-batch',
+    non: '/api4/non-inventory-item-batch'
+  };
+  const ALLOWED = Object.keys(PATHS).map(function (k) { return PATHS[k]; });
+  const PRICE_KEYS = ['salesUnitPrice', 'purchaseUnitPrice', 'unitPrice', 'price', 'Price', 'SalesUnitPrice', 'PurchaseUnitPrice', 'UnitPrice'];
+  const GUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+  const POLL_MS = 3000;
+
+  const $ = function (id) { return document.getElementById(id); };
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  /* ---------- Security: read-only + whitelist ---------- */
+  function safePath(p) {
+    if (typeof p !== 'string' || p.length > 2048) return false;
+    if (!/^[A-Za-z0-9._\-/?=&%+:,]+$/.test(p)) return false;
+    return ALLOWED.some(function (a) { return p === a || p.indexOf(a + '?') === 0; });
+  }
+
+  /* ---------- Bridge (origin-pinned postMessage) ---------- */
+  let ORIGIN = null;
+  function lockOrigin(ev) {
+    if (!ORIGIN && ev.origin) {
+      ORIGIN = ev.origin;
+      const p = $('originPill'); p.textContent = '🔒 ' + ORIGIN; p.className = 'pill ok';
+    }
+  }
+  function setConn(text, cls) { const p = $('connPill'); p.textContent = text; p.className = 'pill ' + (cls || ''); }
+
+  function api(path) {
+    return new Promise(function (resolve, reject) {
+      if (!safePath(path)) { reject(new Error('Blocked: path not allowed')); return; }
+      const id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now();
+      const timer = setTimeout(function () {
+        window.removeEventListener('message', h);
+        reject(new Error('Timed out waiting for Manager (' + path.split('?')[0] + ')'));
+      }, 30000);
+      function h(ev) {
+        if (ev.source !== window.parent) return;
+        if (ORIGIN && ev.origin !== ORIGIN) return;
+        const d = ev.data;
+        if (!d || d.requestId !== id) return;
+        if (typeof d.type !== 'string' || !(d.type === 'api-response' || /-responses?$/.test(d.type))) return;
+        clearTimeout(timer);
+        window.removeEventListener('message', h);
+        lockOrigin(ev);
+        resolve(d.body);
+      }
+      window.addEventListener('message', h);
+      window.parent.postMessage({ type: 'api-request', method: 'GET', path: path, requestId: id }, '*');
+    });
+  }
+
+  async function getAll(endpoint, onProgress) {
+    const all = []; let token = null, pages = 0;
+    do {
+      const path = endpoint + '?PageSize=99999' + (token ? '&next_page_token=' + encodeURIComponent(token) : '');
+      const data = await api(path);
+      const page = Array.isArray(data) ? data : (data && (data.items || data.Items)) || [];
+      all.push.apply(all, page);
+      token = (data && (data.next_page_token || data.nextPageToken)) || null;
+      pages++;
+      if (onProgress) onProgress(all.length);
+    } while (token && pages < 1000);
+    return all;
+  }
+
+  /* ---------- Data helpers ---------- */
+  function unwrap(o) {   // batch endpoints return { key, item: {...record...}, _links, _actions }
+    return (o && o.item && typeof o.item === 'object' && !Array.isArray(o.item)) ? o.item : o;
+  }
+  function refId(v) {
+    if (v == null) return null;
+    if (typeof v === 'object') { const x = v.key != null ? v.key : (v.id != null ? v.id : (v.Key != null ? v.Key : v.Id)); return x == null ? null : String(x).toLowerCase(); }
+    const s = String(v).trim();
+    return s ? s.toLowerCase() : null;
+  }
+  function num(v) { const n = parseFloat(v); return isFinite(n) ? n : null; }
+  function linePrice(l) {
+    for (let i = 0; i < PRICE_KEYS.length; i++) { const n = num(l[PRICE_KEYS[i]]); if (n !== null) return { v: n, k: PRICE_KEYS[i] }; }
+    const amt = num(l.amount != null ? l.amount : (l.lineAmount != null ? l.lineAmount : l.total));
+    const q = num(l.qty != null ? l.qty : (l.Qty != null ? l.Qty : l.quantity));
+    if (amt !== null && q) return { v: amt / q, k: 'amount/qty' };
+    return null;
+  }
+  function fmtP(n) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 }); }
+  function fmtQ(n) { return n == null ? '—' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 3 }); }
+
+  /* ---------- State ---------- */
+  const S = {
+    mode: 'sales',
+    docs: { sales: [], purchase: [] },
+    pname: { sales: new Map(), purchase: new Map() },     // party id -> name (parties that have documents)
+    names2key: { sales: new Map(), purchase: new Map() }, // label -> party id
+    iname: new Map(),                                     // item id -> name
+    ctx: null, ctxJson: '',
+    curKey: null, curItems: new Set(),
+    party: null, manual: false, lastAutoParty: null,
+    expanded: new Set(), loaded: false,
+    stats: { lines: 0, noPrice: 0, priceKeys: {} }
+  };
+
+  /* ---------- Load ---------- */
+  function normDocs(list, mode) {
+    return list.map(function (rec) {
+      const d = unwrap(rec) || {};
+      const party = refId(mode === 'sales' ? (d.customer != null ? d.customer : d.Customer) : (d.supplier != null ? d.supplier : d.Supplier));
+      const rawDate = d.issueDate != null ? d.issueDate : (d.date != null ? d.date : (d.Date != null ? d.Date : ''));
+      const lines = [];
+      (d.lines || d.Lines || []).forEach(function (l) {
+        const item = refId(l.item != null ? l.item : l.Item);
+        if (!item) return;
+        S.stats.lines++;
+        const p = linePrice(l);
+        if (!p) { S.stats.noPrice++; return; }
+        S.stats.priceKeys[p.k] = (S.stats.priceKeys[p.k] || 0) + 1;
+        const desc = l.description != null ? l.description : l.Description;
+        if (desc && !S.iname.has(item)) S.iname.set('desc:' + item, String(desc).split('\n')[0].slice(0, 80));
+        lines.push({ item: item, qty: num(l.qty != null ? l.qty : (l.Qty != null ? l.Qty : l.quantity)), price: p.v });
+      });
+      return {
+        key: String(rec.key != null ? rec.key : (d.key != null ? d.key : '')).toLowerCase(),
+        mode: mode, party: party,
+        date: String(rawDate).slice(0, 10),
+        ref: d.reference != null ? String(d.reference) : (d.Reference != null ? String(d.Reference) : ''),
+        fx: num(d.exchangeRate != null ? d.exchangeRate : d.ExchangeRate),
+        lines: lines
+      };
+    });
+  }
+  function nameMap(list, keys) {
+    const m = new Map();
+    list.forEach(function (rec) {
+      const r = unwrap(rec) || {};
+      const id = refId(rec.key != null ? rec.key : (r.key != null ? r.key : r.id));
+      let nm = null;
+      for (let i = 0; i < keys.length && !nm; i++) if (r[keys[i]]) nm = String(r[keys[i]]);
+      if (id && nm) m.set(id, nm);
+    });
+    return m;
+  }
+
+  async function load() {
+    setConn('Loading…', 'busy');
+    $('msg').className = 'msg'; $('msg').textContent = 'Loading invoices…';
+    $('msg').classList.remove('hidden'); $('tw').classList.add('hidden');
+    try {
+      const n = { s: 0, p: 0 };
+      const prog = function () { $('msg').textContent = 'Loading invoices… sales ' + n.s + ' · purchases ' + n.p; };
+      const opt = function (ep) { return getAll(ep).catch(function () { return []; }); };
+      const res = await Promise.all([
+        getAll(PATHS.sales, function (c) { n.s = c; prog(); }),
+        getAll(PATHS.purchase, function (c) { n.p = c; prog(); }),
+        opt(PATHS.customers), opt(PATHS.suppliers), opt(PATHS.inv), opt(PATHS.non)
+      ]);
+
+      S.iname = new Map(); S.stats = { lines: 0, noPrice: 0, priceKeys: {} };
+      const inames = nameMap(res[4], ['itemName', 'name', 'ItemName', 'Name']);
+      nameMap(res[5], ['name', 'itemName', 'Name']).forEach(function (v, k) { if (!inames.has(k)) inames.set(k, v); });
+      inames.forEach(function (v, k) { S.iname.set(k, v); });
+
+      S.docs.sales = normDocs(res[0], 'sales');
+      S.docs.purchase = normDocs(res[1], 'purchase');
+
+      const cn = nameMap(res[2], ['name', 'Name', 'code']);
+      const sn = nameMap(res[3], ['name', 'Name', 'code']);
+      ['sales', 'purchase'].forEach(function (mode) {
+        const names = mode === 'sales' ? cn : sn;
+        const pm = new Map(); const seen = {};
+        S.docs[mode].forEach(function (d) { if (d.party && !pm.has(d.party)) pm.set(d.party, names.get(d.party) || ((mode === 'sales' ? 'Customer ' : 'Supplier ') + d.party.slice(0, 8))); });
+        S.pname[mode] = pm;
+        const label2key = new Map();
+        Array.from(pm.entries()).sort(function (a, b) { return a[1].localeCompare(b[1]); }).forEach(function (e) {
+          let label = e[1]; if (seen[label]) label += ' · ' + e[0].slice(0, 4);
+          seen[e[1]] = (seen[e[1]] || 0) + 1;
+          label2key.set(label, e[0]);
+        });
+        S.names2key[mode] = label2key;
+      });
+
+      S.loaded = true;
+      setConn('Connected · ' + S.docs.sales.length + ' sales / ' + S.docs.purchase.length + ' purchase invoices', 'ok');
+      applyContext(true);
+      render();
+    } catch (e) {
+      console.error(e);
+      setConn('Error', 'err');
+      $('msg').className = 'msg err';
+      $('msg').textContent = 'Could not load data: ' + (e && e.message ? e.message : 'unknown error');
+    }
+    postResize();
+  }
+
+  /* ---------- Page context from Manager (what is being edited) ---------- */
+  function onContext(body) {
+    const json = (function () { try { return JSON.stringify(body); } catch (e) { return ''; } })();
+    if (json === S.ctxJson) return;
+    S.ctxJson = json; S.ctx = body;
+    $('ctxRaw').textContent = json.slice(0, 2000) || '(empty)';
+    if (S.loaded) { applyContext(false); render(); }
+  }
+
+  function applyContext(first) {
+    const body = S.ctx; if (!body) return;
+    const handler = String(body.handler || '');
+    const q = body.query || {};
+    const key = String(q.key || q.Key || '').toLowerCase() || null;
+    let mode = null;
+    if (/purchase|supplier/i.test(handler)) mode = 'purchase';
+    else if (/sales|customer|delivery|credit/i.test(handler)) mode = 'sales';
+
+    let doc = null;
+    if (key) {
+      const order = mode ? [mode, mode === 'sales' ? 'purchase' : 'sales'] : ['sales', 'purchase'];
+      for (let i = 0; i < order.length && !doc; i++) doc = S.docs[order[i]].find(function (d) { return d.key === key; }) || null;
+      if (doc) mode = doc.mode;
+    }
+    const keyChanged = (key || null) !== S.curKey;
+    S.curKey = doc ? doc.key : key;
+    S.curItems = doc ? new Set(doc.lines.map(function (l) { return l.item; })) : new Set();
+
+    // Generic scan: any known party / item id mentioned anywhere in the context
+    const guids = Array.from(new Set((JSON.stringify(body).match(GUID_RE) || []).map(function (g) { return g.toLowerCase(); })));
+    guids.forEach(function (g) { if (S.iname.has(g)) S.curItems.add(g); });
+
+    let party = doc ? doc.party : null;
+    if (!party) {
+      const modes = mode ? [mode] : ['sales', 'purchase'];
+      for (let i = 0; i < modes.length && !party; i++) {
+        for (let j = 0; j < guids.length; j++) {
+          if (guids[j] !== S.curKey && S.pname[modes[i]].has(guids[j])) { party = guids[j]; if (!mode) mode = modes[i]; break; }
+        }
+      }
+    }
+    if (mode && mode !== S.mode) { S.mode = mode; if (!S.manual) S.party = null; }
+    if (party && (!S.manual || party !== S.lastAutoParty)) { S.party = party; S.manual = false; }
+    if (party) S.lastAutoParty = party;
+    if (first || keyChanged) $('onlyCur').checked = S.curItems.size > 0;
+  }
+
+  /* ---------- Build history ---------- */
+  function itemName(id) { return S.iname.get(id) || S.iname.get('desc:' + id) || ('Item ' + id.slice(0, 8)); }
+
+  function build() {
+    const mode = S.mode, byItem = new Map(), others = new Map();
+    S.docs[mode].forEach(function (d) {
+      if (d.key === S.curKey) return;      // never count the invoice being edited
+      d.lines.forEach(function (l) {
+        const e = { item: l.item, date: d.date, ref: d.ref, qty: l.qty, price: l.price, fx: d.fx };
+        if (d.party === S.party) { if (!byItem.has(l.item)) byItem.set(l.item, []); byItem.get(l.item).push(e); }
+        else { if (!others.has(l.item)) others.set(l.item, []); others.get(l.item).push(e); }
+      });
+    });
+    const rows = [];
+    byItem.forEach(function (list, id) {
+      list.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+      const ps = list.map(function (e) { return e.price; });
+      const last = list[0], prev = list[1] || null;
+      const o = others.get(id);
+      let oth = null;
+      if (o && o.length) {
+        o.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+        oth = { last: o[0].price, avg: o.reduce(function (s, e) { return s + e.price; }, 0) / o.length, n: o.length };
+      }
+      rows.push({
+        id: id, name: itemName(id), list: list, last: last,
+        pct: prev && prev.price ? ((last.price - prev.price) / prev.price) * 100 : null,
+        min: Math.min.apply(null, ps), max: Math.max.apply(null, ps),
+        avg: ps.reduce(function (s, v) { return s + v; }, 0) / ps.length,
+        trend: list.slice(0, 12).map(function (e) { return e.price; }).reverse(),
+        oth: oth, onInv: S.curItems.has(id)
+      });
+    });
+    rows.sort(function (a, b) {
+      if (a.onInv !== b.onInv) return a.onInv ? -1 : 1;
+      if (a.last.date !== b.last.date) return a.last.date < b.last.date ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
+    return rows;
+  }
+
+  function spark(vals) {
+    if (vals.length < 2) return '<span class="flat">—</span>';
+    const w = 70, h = 20, mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals), rng = mx - mn || 1;
+    const pts = vals.map(function (v, i) { return (i * (w - 4) / (vals.length - 1) + 2).toFixed(1) + ',' + (h - 2 - ((v - mn) / rng) * (h - 4)).toFixed(1); });
+    const lp = pts[pts.length - 1].split(',');
+    return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" aria-hidden="true"><polyline fill="none" stroke="#2563eb" stroke-width="1.6" points="' + pts.join(' ') + '"/><circle cx="' + lp[0] + '" cy="' + lp[1] + '" r="2.4" fill="#2563eb"/></svg>';
+  }
+
+  /* ---------- Render ---------- */
+  function partyLabel() { return S.mode === 'sales' ? 'customer' : 'supplier'; }
+
+  function renderControls() {
+    document.querySelectorAll('#modeSeg button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-m') === S.mode); });
+    $('partyLbl').textContent = S.mode === 'sales' ? 'Customer' : 'Supplier';
+    $('othersLbl').textContent = S.mode === 'sales' ? 'customers' : 'suppliers';
+    const dl = $('partyList');
+    dl.innerHTML = Array.from(S.names2key[S.mode].keys()).map(function (l) { return '<option value="' + esc(l) + '"></option>'; }).join('');
+    const nm = S.party ? S.pname[S.mode].get(S.party) : '';
+    if (document.activeElement !== $('partyIn')) {
+      let label = nm || '';
+      S.names2key[S.mode].forEach(function (k, l) { if (k === S.party) label = l; });
+      $('partyIn').value = label;
+    }
+    $('curWrap').hidden = S.curItems.size === 0;
+    $('tbl').className = $('showOthers').checked ? '' : 'hide-others';
+  }
+
+  function renderCtx() {
+    const tags = [];
+    if (S.curKey) tags.push('<span class="tag">Editing existing document</span>');
+    else if (S.ctx) tags.push('<span class="tag warn">New / unsaved document — pick the ' + partyLabel() + ' manually</span>');
+    else tags.push('<span class="tag warn">No page context received — pick the ' + partyLabel() + ' manually</span>');
+    if (S.party) tags.push('<span class="tag">' + (S.manual ? 'Selected' : 'Detected') + ': ' + esc(S.pname[S.mode].get(S.party) || S.party) + '</span>');
+    if (S.curItems.size) tags.push('<span class="tag">' + S.curItems.size + ' item(s) on this invoice</span>');
+    $('ctxLine').innerHTML = tags.join('');
+  }
+
+  function render() {
+    renderControls(); renderCtx();
+    const msg = $('msg'), tw = $('tw');
+    if (!S.loaded) return;
+    const diag = [];
+    diag.push('Sales invoices: <b>' + S.docs.sales.length + '</b> · Purchase invoices: <b>' + S.docs.purchase.length + '</b>');
+    diag.push('Invoice lines with an item: <b>' + S.stats.lines + '</b>, without a readable price: <b>' + S.stats.noPrice + '</b>');
+    diag.push('Price fields used: <b>' + esc(JSON.stringify(S.stats.priceKeys)) + '</b>');
+    diag.push('Item names resolved: <b>' + Array.from(S.iname.keys()).filter(function (k) { return k.indexOf('desc:') !== 0; }).length + '</b>');
+    $('diagInfo').innerHTML = diag.join('<br>');
+    let sample = null;
+    for (const doc of [].concat(S.docs.sales, S.docs.purchase)) if (doc.lines.length) { sample = doc.lines[0]; break; }
+    $('lineRaw').textContent = sample ? JSON.stringify(sample) + '\n(normalised; open Manager’s API view for the raw line)' : '(no priced lines found)';
+
+    if (S.stats.lines > 0 && S.stats.noPrice / S.stats.lines > 0.5) {
+      msg.className = 'msg err'; msg.classList.remove('hidden'); tw.classList.add('hidden');
+      msg.textContent = 'Most invoice lines have no recognisable unit-price field. Open Diagnostics and send the raw line so the field name can be added.';
+      postResize(); return;
+    }
+    if (!S.party) {
+      msg.className = 'msg'; msg.classList.remove('hidden'); tw.classList.add('hidden');
+      msg.textContent = 'Select a ' + partyLabel() + ' above to see previous prices.';
+      $('foot').textContent = ''; postResize(); return;
+    }
+
+    const q = $('q').value.trim().toLowerCase();
+    const onlyCur = $('onlyCur').checked && S.curItems.size > 0;
+    const all = build();
+    const rows = all.filter(function (r) { return (!q || r.name.toLowerCase().indexOf(q) !== -1) && (!onlyCur || r.onInv); });
+
+    if (!rows.length) {
+      msg.className = 'msg'; msg.classList.remove('hidden'); tw.classList.add('hidden');
+      msg.textContent = all.length ? 'No products match the current filters.' : 'No previous invoices with prices found for this ' + partyLabel() + '.';
+      $('foot').textContent = ''; postResize(); return;
+    }
+    msg.classList.add('hidden'); tw.classList.remove('hidden');
+    const bad = S.mode === 'purchase' ? ' bad' : '';
+
+    $('rows').innerHTML = rows.map(function (r) {
+      let chg = '<span class="flat">—</span>';
+      if (r.pct !== null) {
+        const c = Math.abs(r.pct) < 0.05 ? 'flat' : (r.pct > 0 ? 'up' : 'down') + bad;
+        chg = '<span class="' + c + '">' + (r.pct > 0.05 ? '▲ ' : r.pct < -0.05 ? '▼ ' : '● ') + Math.abs(r.pct).toFixed(1) + '%</span>';
+      }
+      const fx = r.last.fx && r.last.fx !== 1 ? '<span class="fx" title="Invoice used exchange rate ' + esc(r.last.fx) + '; price shown in the invoice currency">FX ' + esc(r.last.fx) + '</span>' : '';
+      const open = S.expanded.has(r.id);
+      let html = '<tr class="row' + (r.onInv ? ' cur' : '') + '" data-id="' + esc(r.id) + '">' +
+        '<td>' + (open ? '▾ ' : '▸ ') + esc(r.name) + (r.onInv ? '<span class="badge">on this invoice</span>' : '') + '</td>' +
+        '<td class="n price">' + fmtP(r.last.price) + fx + '</td>' +
+        '<td>' + esc(r.last.date || '—') + '</td>' +
+        '<td class="n">' + chg + '</td>' +
+        '<td class="n">' + fmtQ(r.last.qty) + '</td>' +
+        '<td class="n">' + fmtP(r.min) + '</td>' +
+        '<td class="n">' + fmtP(r.avg) + '</td>' +
+        '<td class="n">' + fmtP(r.max) + '</td>' +
+        '<td class="n">' + r.list.length + '</td>' +
+        '<td>' + spark(r.trend) + '</td>' +
+        '<td class="n oth">' + (r.oth ? fmtP(r.oth.last) : '—') + '</td>' +
+        '<td class="n oth">' + (r.oth ? fmtP(r.oth.avg) + ' <span class="flat">(' + r.oth.n + ')</span>' : '—') + '</td>' +
+        '<td><button class="copy" data-copy="' + esc(r.last.price) + '" title="Copy last price">⧉ Copy</button></td></tr>';
+      if (open) {
+        html += '<tr class="detail"><td colspan="13"><table><thead><tr><th>Date</th><th>Invoice ref.</th><th class="n">Qty</th><th class="n">Price</th></tr></thead><tbody>' +
+          r.list.map(function (e) {
+            return '<tr><td>' + esc(e.date || '—') + '</td><td>' + esc(e.ref || '—') + '</td><td class="n">' + fmtQ(e.qty) + '</td><td class="n"><b>' + fmtP(e.price) + '</b>' +
+              (e.fx && e.fx !== 1 ? '<span class="fx">FX ' + esc(e.fx) + '</span>' : '') + '</td></tr>';
+          }).join('') + '</tbody></table></td></tr>';
+      }
+      return html;
+    }).join('');
+    $('foot').textContent = rows.length + ' product(s) previously ' + (S.mode === 'sales' ? 'sold to' : 'bought from') + ' this ' + partyLabel() +
+      '. Prices are shown as stored on each invoice (invoice currency). Click a row for the full history.';
+    postResize();
+  }
+
+  /* ---------- Clipboard ---------- */
+  function copyText(t, btn) {
+    const done = function () { const o = btn.textContent; btn.textContent = '✓ Copied'; setTimeout(function () { btn.textContent = o; }, 1100); };
+    const fb = function () {
+      const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { window.prompt('Copy price:', t); }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, fb); else fb();
+  }
+
+  /* ---------- Resize (inline placement starts at 150px) ---------- */
+  let lastH = 0;
+  function postResize() {
+    const h = Math.ceil(document.documentElement.scrollHeight);
+    if (Math.abs(h - lastH) > 2) { lastH = h; window.parent.postMessage({ type: 'resize', height: h }, '*'); }
+  }
+
+  /* ---------- Wire up ---------- */
+  $('modeSeg').addEventListener('click', function (e) {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    S.mode = b.getAttribute('data-m'); S.party = null; S.manual = true; $('partyIn').value = ''; render();
+  });
+  $('partyIn').addEventListener('change', function () {
+    const k = S.names2key[S.mode].get($('partyIn').value);
+    S.party = k || null; S.manual = true; render();
+  });
+  $('q').addEventListener('input', render);
+  $('onlyCur').addEventListener('change', render);
+  $('showOthers').addEventListener('change', render);
+  $('reloadBtn').addEventListener('click', load);
+  $('rows').addEventListener('click', function (e) {
+    const cp = e.target.closest('button[data-copy]');
+    if (cp) { e.stopPropagation(); copyText(cp.getAttribute('data-copy'), cp); return; }
+    const tr = e.target.closest('tr.row'); if (!tr) return;
+    const id = tr.getAttribute('data-id');
+    if (S.expanded.has(id)) S.expanded.delete(id); else S.expanded.add(id);
+    render();
+  });
+  if (window.ResizeObserver) new ResizeObserver(postResize).observe(document.body);
+
+  // Page context replies (Manager answers only after a 'page-request')
+  window.addEventListener('message', function (ev) {
+    if (ev.source !== window.parent) return;
+    if (ORIGIN && ev.origin !== ORIGIN) return;
+    const d = ev.data;
+    if (!d || d.type !== 'page-response') return;
+    lockOrigin(ev);
+    onContext(d.body || {});
+  });
+  function askContext() { try { window.parent.postMessage({ type: 'page-request' }, '*'); } catch (e) { /* ignore */ } }
+
+  function start() {
+    if (window.parent === window) {
+      setConn('Standalone', 'err');
+      $('msg').className = 'msg err';
+      $('msg').innerHTML = 'This extension must be opened inside Manager.io:<br><b>Settings → Extensions → New Extension</b>, then paste this page’s URL and choose a placement (e.g. the sales invoice form).';
+      return;
+    }
+    askContext();
+    setInterval(askContext, POLL_MS);   // picks up changes if Manager updates the context while editing
+    load();
+  }
+  setTimeout(start, 300);
+})();
+</script>
+</body>
+</html>
